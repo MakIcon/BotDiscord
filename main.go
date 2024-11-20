@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"net/http"
 	"os"
@@ -177,6 +178,71 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 
 			handleBalcklistChange(parts[1])
+
+		case prefix3 + "setrep":
+			if m.Author.ID != "1184449624950460488" || len(parts) < 3 {
+				err := s.MessageReactionAdd(m.ChannelID, m.ID, "❌")
+				if err != nil {
+					panic(err)
+				}
+				return
+			}
+
+			userID := extractUserID(parts[1])
+
+			oldRep := memebersrep[userID]
+
+			newRep, err := strconv.Atoi(parts[2])
+			if err != nil {
+				err := s.MessageReactionAdd(m.ChannelID, m.ID, "❌")
+				if err != nil {
+					panic(err)
+				}
+				return
+			}
+
+			const progressBarLength = 15
+			increment := 35
+
+			previousMessage := fmt.Sprintf("**%d** [%s] **%d**", oldRep, strings.Repeat("-", progressBarLength), newRep)
+			msg, err := s.ChannelMessageSend(m.ChannelID, previousMessage)
+			if err != nil {
+				panic(err)
+			}
+
+			memebersrep[userID] = newRep
+			saveJSON("rate.json", &memebersrep)
+
+			go func() {
+				diff := newRep - oldRep
+				if diff != 0 {
+					step := diff / int(math.Abs(float64(diff))) * increment
+					for i := oldRep; i != newRep; i += step {
+						if (step > 0 && i > newRep) || (step < 0 && i < newRep) {
+							i = newRep
+						}
+						progress := (i - oldRep) * progressBarLength / (newRep - oldRep)
+						bars := strings.Repeat("=", progress) + strings.Repeat("-", progressBarLength-progress)
+						mess := fmt.Sprintf("**%d** [%s] **%d**", oldRep, bars, newRep)
+						_, err := s.ChannelMessageEdit(m.ChannelID, msg.ID, mess)
+						if err != nil {
+							panic(err)
+						}
+						fmt.Println("fewfwfewfwef")
+
+						if i == newRep {
+							fmt.Println("ergergeg")
+							break
+						}
+					}
+				}
+				//bars := strings.Repeat("=", progressBarLength)
+				//finalMessage := fmt.Sprintf("**%d** [%s] **%d**", oldRep, bars, newRep)
+				//_, err := s.ChannelMessageEdit(m.ChannelID, msg.ID, finalMessage)
+				//if err != nil {
+				//	panic(err)
+				//}
+			}()
 
 		}
 	}
@@ -392,10 +458,12 @@ func randomString(length int, useEmojis bool) string {
 
 func handleBalcklistChange(userf string) {
 
-	if _, ok := whiteList[userf]; ok {
-		delete(whiteList, userf)
+	ext := extractUserID(userf)
+
+	if _, ok := whiteList[ext]; ok {
+		delete(whiteList, ext)
 	} else {
-		whiteList[userf] = true
+		whiteList[ext] = true
 	}
 
 	saveJSON("whiteList.json", &whiteList)
