@@ -124,7 +124,7 @@ func saveJSON(filename string, v interface{}) {
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
-	if !allowedChannels[m.ChannelID] || !whiteList[m.Author.ID] {
+	if !allowedChannels[m.ChannelID] || whiteList[m.Author.ID] {
 		return
 	}
 
