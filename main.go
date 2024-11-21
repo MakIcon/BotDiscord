@@ -46,9 +46,7 @@ var (
 		"1091008984913289307": true,
 	}
 
-	whiteList = map[string]bool{
-		"00000000": true,
-	}
+	whiteList = map[string]bool{}
 
 	mu sync.Mutex
 
@@ -126,7 +124,7 @@ func saveJSON(filename string, v interface{}) {
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
-	if !allowedChannels[m.ChannelID] && !whiteList[m.Author.ID] {
+	if !allowedChannels[m.ChannelID] || !whiteList[m.Author.ID] {
 		return
 	}
 
@@ -175,6 +173,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 					panic(err)
 				}
 				return
+			} else {
+				err := s.MessageReactionAdd(m.ChannelID, m.ID, "✅")
+				if err != nil {
+					panic(err)
+				}
 			}
 
 			handleBalcklistChange(parts[1])
