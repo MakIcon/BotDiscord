@@ -227,7 +227,7 @@ func handleSetReputation(s *discordgo.Session, m *discordgo.MessageCreate, parts
 // Список лидеров
 func handleLeadersCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 
-	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("https://c12.play2go.cloud:20053 \n ||%s||", randomString(10, false)))
+	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("http://c12.play2go.cloud:20053/ \n||%s||", randomString(10, false)))
 	handleError(err)
 
 }
