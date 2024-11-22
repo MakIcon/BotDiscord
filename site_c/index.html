@@ -86,7 +86,10 @@
         const leaderboard = document.getElementById('leaderboard');
         leaderboard.innerHTML = ''; // Очищаем предыдущие данные
 
-        for (const [userId, rep] of Object.entries(data)) {
+        // Сортировка участников по репутации (по убыванию)
+        const sortedData = Object.entries(data).sort((a, b) => b[1] - a[1]);
+
+        for (const [userId, rep] of sortedData) {
             const userDiv = document.createElement('div');
             userDiv.textContent = `Пользователь ${userId}: ${rep} реп`;
             userDiv.classList.add('user-entry'); // Adding a class for styling
