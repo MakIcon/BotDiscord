@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leader Board</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(to right, #4facfe, #00f2fe); /* Gradient background */
+        }
+
+        .background-image {
+            background-image: url('https://github.com/MakIcon/BotDiscord/blob/main/sdelaydela.jpg?raw=true'); /* Optional image */
+            background-size: cover;
+            background-attachment: fixed;
+            height: 100vh;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+
+        .overlay {
+            background: linear-gradient(rgba(207, 241, 235, 0.74), rgba(207, 222, 246, 0.72)); /* Transparent gradient */
+            padding: 20px;
+            border-radius: 15px;
+            margin: 50px auto; /* Centering the overlay */
+            width: 80%; /* Making the leaderboard narrower */
+            max-width: 800px; /* Maximum width for larger screens */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            text-align: center; /* Centering the header */
+            font-size: 2.5em; /* Increased font size for the header */
+        }
+
+        #leaderboard {
+            margin-top: 20px;
+            text-align: center; /* Centering text in the leaderboard */
+            border-radius: 10px; /* Rounded corners for leaderboard */
+            padding: 10px; /* Padding inside the leaderboard */
+        }
+
+        #blacklistOverlay {
+            margin-top: 20px;
+            text-align: center;
+            border-radius: 10px;
+            padding: 10px;
+            background: rgba(207, 222, 246, 0.72); /* Background similar to the first overlay */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .user-entry {
+            font-size: 1.1em; /* Increased font size for user entries */
+            margin: 5px 0; /* Spacing between user entries */
+        }
+    </style>
+</head>
+<body>
+<div class="background-image"></div>
+<div class="overlay">
+    <h1>Таблица лидеров</h1>
+    <div id="leaderboard">
+        <!-- Данные о репутации будут вставлены сюда -->
+    </div>
+</div>
+
+<div class="overlay" id="blacklistOverlay">
+    <h1>Забаненные участники</h1>
+    <div id="blacklist">
+        <!-- Данные о забаненных участниках будут вставлены сюда -->
+    </div>
+</div>
+
+<script>
+    async function fetchReputation() {
+        const response = await fetch('/reputation');
+        const data = await response.json();
+        const leaderboard = document.getElementById('leaderboard');
+        leaderboard.innerHTML = ''; // Очищаем предыдущие данные
+
+        for (const [userId, rep] of Object.entries(data)) {
+            const userDiv = document.createElement('div');
+            userDiv.textContent = `Пользователь ${userId}: ${rep} реп`;
+            userDiv.classList.add('user-entry'); // Adding a class for styling
+            leaderboard.appendChild(userDiv);
+        }
+    }
+
+    async function fetchBlacklist() {
+        const response = await fetch('/blacklist');
+        const data = await response.json();
+        const blacklistDiv = document.getElementById('blacklist');
+        blacklistDiv.innerHTML = ''; // Очищаем предыдущие данные
+
+        for (const userId of data) {
+            const userDiv = document.createElement('div');
+            userDiv.textContent = `Пользователь ${userId} забанен`;
+            userDiv.classList.add('user-entry'); // Добавление класса для стилизации
+            blacklistDiv.appendChild(userDiv);
+        }
+    }
+
+    setInterval(fetchReputation, 5000); // Обновление данных каждые 5 секунд
+    setInterval(fetchBlacklist, 5000); // Обновление данных забаненных пользователей каждые 5 секунд
+    fetchReputation(); // Первоначальная загрузка при открытии
+    fetchBlacklist(); // Первоначальная загрузка черного списка
+</script>
+</body>
+</html>
