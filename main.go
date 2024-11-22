@@ -64,7 +64,7 @@ func main() {
 	// Decode the token
 	decodedBytes, err := base64.StdEncoding.DecodeString(encodedToken)
 	if err != nil {
-		fmt.Println("Error decoding token:", err)
+		panic(err)
 		return
 	}
 
@@ -81,7 +81,7 @@ func main() {
 
 	dg, err := discordgo.New(decodedToken)
 	if err != nil {
-		fmt.Println("Error creating Discord session:", err)
+		panic(err)
 		return
 	}
 
@@ -96,9 +96,8 @@ func main() {
 	dg.AddHandler(messageCreate)
 
 	err = dg.Open()
-	if err != nil {
-		panic(err)
-	}
+	handleError(err)
+	
 	defer dg.Close()
 
 	fmt.Println("Bot is now running. Press Ctrl+C to exit.")
@@ -149,18 +148,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			if num > 15 {
 				err := s.MessageReactionAdd(m.ChannelID, m.ID, "❌")
-				if err != nil {
-					panic(err)
-				}
+				handleError(err)
 				return
 			}
 
 			random := randomString(num, true)
 
 			_, err = s.ChannelMessageSend(m.ChannelID, random)
-			if err != nil {
-				panic(err)
-			}
+			handleError(err)
 
 		case prefix3 + "leaders":
 			handleLeadersCommand(s, m)
@@ -169,15 +164,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			if m.Author.ID != "1184449624950460488" {
 				err := s.MessageReactionAdd(m.ChannelID, m.ID, "❌")
-				if err != nil {
-					panic(err)
-				}
+				handleError(err)
 				return
 			} else {
 				err := s.MessageReactionAdd(m.ChannelID, m.ID, "✅")
-				if err != nil {
-					panic(err)
-				}
+				handleError(err)
 			}
 
 			handleBalcklistChange(parts[1])
@@ -185,9 +176,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		case prefix3 + "setrep":
 			if m.Author.ID != "1184449624950460488" || len(parts) < 3 {
 				err := s.MessageReactionAdd(m.ChannelID, m.ID, "❌")
-				if err != nil {
-					panic(err)
-				}
+				handleError(err)
 				return
 			}
 
@@ -198,9 +187,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			newRep, err := strconv.Atoi(parts[2])
 			if err != nil {
 				err := s.MessageReactionAdd(m.ChannelID, m.ID, "❌")
-				if err != nil {
-					panic(err)
-				}
+				handleError(err)
 				return
 			}
 
@@ -209,9 +196,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			previousMessage := fmt.Sprintf("**%d** [%s] **%d**", oldRep, strings.Repeat("-", progressBarLength), newRep)
 			msg, err := s.ChannelMessageSend(m.ChannelID, previousMessage)
-			if err != nil {
-				panic(err)
-			}
+			handleError(err)
 
 			memebersrep[userID] = newRep
 			saveJSON("rate.json", &memebersrep)
@@ -228,9 +213,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 						bars := strings.Repeat("=", progress) + strings.Repeat("-", progressBarLength-progress)
 						mess := fmt.Sprintf("**%d** [%s] **%d**", oldRep, bars, newRep)
 						_, err := s.ChannelMessageEdit(m.ChannelID, msg.ID, mess)
-						if err != nil {
-							panic(err)
-						}
+						handleError(err)
 						fmt.Println("fewfwfewfwef")
 
 						if i == newRep {
@@ -239,12 +222,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 						}
 					}
 				}
-				//bars := strings.Repeat("=", progressBarLength)
-				//finalMessage := fmt.Sprintf("**%d** [%s] **%d**", oldRep, bars, newRep)
-				//_, err := s.ChannelMessageEdit(m.ChannelID, msg.ID, finalMessage)
-				//if err != nil {
-				//	panic(err)
-				//}
 			}()
 
 		}
@@ -262,8 +239,7 @@ func handleLeadersCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 	for id, rep := range memebersrep {
 		reps = append(reps, userRep{UserID: id, Rep: rep})
 	}
-
-	// Sort the slice by reputation in descending order
+	
 	sort.Slice(reps, func(i, j int) bool {
 		return reps[i].Rep > reps[j].Rep
 	})
@@ -272,23 +248,17 @@ func handleLeadersCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var builder strings.Builder
 	builder.WriteString("-# **Таблица лидеров**\n")
 
-	for index, entry := range reps {
-		if index == 0 {
-			// Header already added
-		}
-
-		// Get user by ID
+	for _, entry := range reps {
+		
 		user, err := s.User(entry.UserID)
 		username := "Неизвестный пользователь"
 		if err == nil {
 			username = user.Username
 		}
-
-		// Format the line
+		
 		builder.WriteString(fmt.Sprintf("-# %s: %d реп\n", username, entry.Rep))
 	}
-
-	// Send the message
+	
 	s.ChannelMessageSend(m.ChannelID, builder.String())
 }
 
@@ -298,20 +268,14 @@ func sendWebhookMessage(webhookURL string, embed *discordgo.MessageEmbed) error 
 		"embeds": []interface{}{embed},
 	}
 	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
+	handleError(err)
 
 	req, err := http.NewRequest("POST", webhookURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
+	handleError(err)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
+	handleError(err)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
@@ -335,10 +299,6 @@ func handleReputationChange(s *discordgo.Session, m *discordgo.MessageCreate, pa
 	defer mu.Unlock()
 
 	if len(parts) != 2 {
-		_, err := s.ChannelMessageSend(m.ChannelID, "Неверное использование команды. Используйте: "+parts[0]+" <user>")
-		if err != nil {
-			fmt.Println("Error sending message:", err)
-		}
 		return
 	}
 
@@ -347,27 +307,20 @@ func handleReputationChange(s *discordgo.Session, m *discordgo.MessageCreate, pa
 
 	if userID == m.Author.ID {
 		err := s.MessageReactionAdd(m.ChannelID, m.ID, "❌")
-		if err != nil {
-			panic(err)
-		}
+		handleError(err)
 		return
 	}
 
-	// Initialize cooldowns for the author if not present
 	if lastTimes, exists := cooldowns[m.Author.ID]; exists {
 		if lastTime, ok := lastTimes[userID]; ok && time.Since(lastTime) < cooldownDuration {
 			_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите 60 секунд перед изменением репутации пользователя **<@%s>**! \n\n||%s||", userID, randomString(10, true)))
-			if err != nil {
-				fmt.Println("Error sending cooldown message:", err)
-			}
+			handleError(err)
 			return
 		}
 	}
 
-	// Get old reputation
 	oldRep := memebersrep[userID]
 
-	// Update reputation
 	if _, ok := memebersrep[userID]; ok {
 		memebersrep[userID] += change
 	} else {
@@ -376,20 +329,15 @@ func handleReputationChange(s *discordgo.Session, m *discordgo.MessageCreate, pa
 
 	newRep := memebersrep[userID]
 
-	// Prepare the channel message
 	message := fmt.Sprintf("**%d** -> **%d**", oldRep, newRep)
 	_, err := s.ChannelMessageSend(m.ChannelID, message)
-	if err != nil {
-		fmt.Println("Error sending reputation message:", err)
-	}
+	handleError(err)
 
-	// Update cooldown
 	if _, ok := cooldowns[m.Author.ID]; !ok {
 		cooldowns[m.Author.ID] = make(map[string]time.Time)
 	}
 	cooldowns[m.Author.ID][userID] = time.Now()
 
-	// Save the updated reputation to the JSON file
 	saveJSON("rate.json", &memebersrep)
 
 	// Prepare the embed for the webhook
@@ -433,10 +381,14 @@ func handleReputationChange(s *discordgo.Session, m *discordgo.MessageCreate, pa
 	}
 
 	err = sendWebhookMessage(webhookURL, embed)
-	if err != nil {
-		fmt.Println("Error sending webhook message:", err)
-	}
+	handleError(err)
 
+}
+
+func handleError(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
 
 func randomString(length int, useEmojis bool) string {
@@ -448,10 +400,9 @@ func randomString(length int, useEmojis bool) string {
 				sb.WriteString(emojis[rand.Intn(len(emojis))])
 			}
 		} else {
-			// Use both charset and emojis with a 50% chance each
-			if rand.Intn(2) == 0 { // 50% chance to choose a character from charset
+			if rand.Intn(2) == 0 {
 				sb.WriteByte(charset[rand.Intn(len(charset))])
-			} else if len(emojis) > 0 { // 50% chance to choose an emoji
+			} else if len(emojis) > 0 {
 				sb.WriteString(emojis[rand.Intn(len(emojis))])
 			}
 		}
