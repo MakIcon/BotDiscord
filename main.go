@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -227,28 +226,10 @@ func handleSetReputation(s *discordgo.Session, m *discordgo.MessageCreate, parts
 
 // Список лидеров
 func handleLeadersCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
-	type userRep struct {
-		UserID string
-		Rep    int
-	}
 
-	reps := make([]userRep, 0, len(membersRep))
-	for id, rep := range membersRep {
-		reps = append(reps, userRep{UserID: id, Rep: rep})
-	}
-
-	sort.Slice(reps, func(i, j int) bool {
-		return reps[i].Rep > reps[j].Rep
-	})
-
-	var builder strings.Builder
-	builder.WriteString("-# **Таблица лидеров**\n")
-
-	for _, entry := range reps {
-		builder.WriteString(fmt.Sprintf("-# %s: %d реп\n", entry.UserID, entry.Rep))
-	}
-
-	s.ChannelMessageSend(m.ChannelID, builder.String())
+	_, err := s.ChannelMessageSend(m.ChannelID, "c12.play2go.cloud:20053")
+	handleError(err)
+	
 }
 
 // Функция для извлечения ID пользователя
