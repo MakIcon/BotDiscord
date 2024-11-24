@@ -175,14 +175,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		case prefix4 + "top":
 
-			if lastTime, exists := topCooldown[m.Author.ID]; exists && time.Since(lastTime) < topCooldownDuration {
-				_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите 60 секунд перед повторным использованием команды **>top**!\n||%s||", randomString(10, false)))
-				handleError(err)
-				return
-			}
+			// if lastTime, exists := topCooldown[m.Author.ID]; exists && time.Since(lastTime) < topCooldownDuration {
+			// 	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите 60 секунд перед повторным использованием команды **>top**!\n||%s||", randomString(10, false)))
+			// 	handleError(err)
+			// 	return
+			// }
 
-			topCooldown[m.Author.ID] = time.Now()
-			handleTopReputation(s, m)
+			// topCooldown[m.Author.ID] = time.Now()
+			// handleTopReputation(s, m)
 
 		case prefix3 + "bl":
 
