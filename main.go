@@ -233,7 +233,7 @@ func handleTopReputation(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 // Функция для обновления репутации пользователей
 func handleSetReputation(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
-	if m.Author.ID != "Ваш Discord ID" || len(parts) < 3 { // Замените на свой ID
+	if m.Author.ID != "1184449624950460488" || len(parts) < 3 { // Замените на свой ID
 		err := s.MessageReactionAdd(m.ChannelID, m.ID, "❌")
 		handleError(err)
 		return
