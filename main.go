@@ -175,16 +175,19 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		case prefix4 + "top":
 
-			// if lastTime, exists := topCooldown[m.Author.ID]; exists && time.Since(lastTime) < topCooldownDuration {
-			// 	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите 60 секунд перед повторным использованием команды **>top**!\n||%s||", randomString(10, false)))
-			// 	handleError(err)
-			// 	return
-			// }
-
-			// topCooldown[m.Author.ID] = time.Now()
-			// handleTopReputation(s, m)
+			//if lastTime, exists := topCooldown[m.Author.ID]; exists && time.Since(lastTime) < topCooldownDuration {
+			//	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите 60 секунд перед повторным использованием команды **>top**!\n||%s||", randomString(10, false)))
+			//	handleError(err)
+			//	return
+			//}
+			//
+			//topCooldown[m.Author.ID] = time.Now()
+			//handleTopReputation(s, m)
 
 		case prefix3 + "bl":
+			
+			err := s.MessageReactionAdd(m.ChannelID, m.ID, "✅")
+			handleError(err)
 
 			ext := extractUserID(parts[1])
 
@@ -281,7 +284,7 @@ func handleSetReputation(s *discordgo.Session, m *discordgo.MessageCreate, parts
 // Список лидеров
 func handleLeadersCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 
-	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("http://c12.play2go.cloud:20053 \n||%s||", randomString(10, false)))
+	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("http://c12.play2go.cloud:20053\n||%s||", randomString(10, false)))
 	handleError(err)
 
 }
@@ -313,7 +316,7 @@ func handleReputationChange(s *discordgo.Session, m *discordgo.MessageCreate, pa
 
 	if lastTimes, exists := cooldowns[m.Author.ID]; exists {
 		if lastTime, ok := lastTimes[userID]; ok && time.Since(lastTime) < cooldownDuration {
-			_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите 60 секунд перед изменением репутации пользователя **<@%s>**!", userID))
+			_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите 60 секунд перед изменением репутации пользователя **<@%s>**!\n||%s||", userID, randomString(10, true)))
 			handleError(err)
 			return
 		}
