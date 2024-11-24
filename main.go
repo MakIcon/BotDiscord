@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,18 +24,23 @@ const (
 	prefix     = "+"
 	prefix2    = "-"
 	prefix3    = "!"
+	prefix4    = ">"
 	charset    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-*&^%$#@!)(*/|"
 	webhookURL = "https://canary.discord.com/api/webhooks/..."
 )
 
 var (
-	emojis           = []string{":poop:", ":heart_eyes_cat:", ":firecracker:", ":leafy_green:", ":money_mouth:", ":imp:", ":wink:", ":pleading_face:", ":x:", ":woman_with_headscarf:", ":key:", ":champagne:", ":tada:", ":white_check_mark:", ":thumbsdown:", ":thumbsup:"}
-	membersRep       = map[string]int{}
-	allowedChannels  = map[string]bool{"1091008984913289307": true}
-	blackList        = map[string]bool{}
-	mu               sync.Mutex
+	emojis          = []string{":poop:", ":heart_eyes_cat:", ":firecracker:", ":leafy_green:", ":money_mouth:", ":imp:", ":wink:", ":pleading_face:", ":x:", ":woman_with_headscarf:", ":key:", ":champagne:", ":tada:", ":white_check_mark:", ":thumbsdown:", ":thumbsup:"}
+	membersRep      = map[string]int{}
+	allowedChannels = map[string]bool{"1091008984913289307": true}
+	blackList       = map[string]bool{}
+	mu              sync.Mutex
+
 	cooldowns        = make(map[string]map[string]time.Time)
 	cooldownDuration = 60 * time.Second
+
+	topCooldown         = make(map[string]time.Time)
+	topCooldownDuration = 60 * time.Second
 )
 
 func main() {
@@ -137,7 +143,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	if strings.HasPrefix(m.Content, prefix) || strings.HasPrefix(m.Content, prefix3) || strings.HasPrefix(m.Content, prefix2) {
+	if strings.HasPrefix(m.Content, prefix) || strings.HasPrefix(m.Content, prefix3) || strings.HasPrefix(m.Content, prefix2) || strings.HasPrefix(m.Content, prefix4) {
 		parts := strings.Fields(m.Content)
 		command := parts[0]
 
@@ -149,7 +155,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			handleReputationChange(s, m, parts, -1)
 
 		case prefix3 + "pls":
-			// Логика команды pls
+
 			if len(parts) < 2 {
 				return
 			}
@@ -164,17 +170,65 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			handleError(err)
 
 		case prefix3 + "leaders":
+
 			handleLeadersCommand(s, m)
 
+		case prefix4 + "top":
+
+			if lastTime, exists := topCooldown[m.Author.ID]; exists && time.Since(lastTime) < topCooldownDuration {
+				_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите 60 секунд перед повторным использованием команды **>top**!\n||%s||", randomString(10, false)))
+				handleError(err)
+				return
+			}
+
+			topCooldown[m.Author.ID] = time.Now()
+			handleTopReputation(s, m)
+
 		case prefix3 + "bl":
-			// Логика команды bl
-			handleBalcklistChange(parts[1])
+
+			ext := extractUserID(parts[1])
+
+			nam := GetNameID(s, m, ext)
+			handleBalcklistChange(ext, nam)
 
 		case prefix3 + "setrep":
-			// Логика команды setrep
 			handleSetReputation(s, m, parts)
 		}
 	}
+}
+
+// Обработка команды для получения топ репутации
+func handleTopReputation(s *discordgo.Session, m *discordgo.MessageCreate) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Создаем слайс для хранения пар (имя, репутация)
+	type UserReputation struct {
+		ID  string
+		Rep int
+	}
+	var userReps []UserReputation
+
+	// Заполняем слайс данными о репутации
+	for id, rep := range membersRep {
+		userReps = append(userReps, UserReputation{ID: id, Rep: rep})
+	}
+
+	// Сортируем данные по убыванию репутации
+	sort.Slice(userReps, func(i, j int) bool {
+		return userReps[i].Rep > userReps[j].Rep
+	})
+
+	// Формируем ответ
+	response := "-# ### 🏆**Топ репутации:**🏆\n"
+	for _, userRep := range userReps {
+		name := GetNameID(s, m, userRep.ID)
+		response += fmt.Sprintf("-# **%s** -> **%d**\n", name, userRep.Rep)
+	}
+	response += fmt.Sprintf("||%s||", randomString(5, false))
+	// Отправляем сообщение с топом пользователей
+	_, err := s.ChannelMessageSend(m.ChannelID, response)
+	handleError(err)
 }
 
 // Функция для обновления репутации пользователей
@@ -227,7 +281,7 @@ func handleSetReputation(s *discordgo.Session, m *discordgo.MessageCreate, parts
 // Список лидеров
 func handleLeadersCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 
-	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("http://c12.play2go.cloud:20053/ \n||%s||", randomString(10, false)))
+	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("http://c12.play2go.cloud:20053 \n||%s||", randomString(10, false)))
 	handleError(err)
 
 }
@@ -311,13 +365,23 @@ func randomString(length int, useEmojis bool) string {
 	return sb.String()
 }
 
+func GetNameID(s *discordgo.Session, m *discordgo.MessageCreate, id string) string {
+	user, err := s.GuildMember(m.GuildID, id)
+	handleError(err)
+	return user.User.Username
+}
+
 // Изменение черного списка
-func handleBalcklistChange(userf string) {
-	ext := extractUserID(userf)
-	if _, ok := blackList[ext]; ok {
-		delete(blackList, ext)
+func handleBalcklistChange(userf string, name string) {
+
+	// Create the key in the format "userID, name"
+	key := fmt.Sprintf("%s, %s", userf, name)
+
+	if _, ok := blackList[key]; ok {
+		delete(blackList, key)
 	} else {
-		blackList[ext] = true
+		blackList[key] = true
 	}
+
 	saveJSON("blackList.json", &blackList)
 }
