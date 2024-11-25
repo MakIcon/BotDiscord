@@ -15,7 +15,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -34,18 +33,28 @@ var (
 	membersRep      = map[string]int{}
 	allowedChannels = map[string]bool{"1091008984913289307": true}
 	blackList       = map[string]bool{}
-	mu              sync.Mutex
 
 	cooldowns        = make(map[string]map[string]time.Time)
 	cooldownDuration = 60 * time.Second
 
 	topCooldown         = make(map[string]time.Time)
 	topCooldownDuration = 60 * time.Second
+
+	messageCounts = make(map[string]int)
+	totalMessages = 0
 )
+
+type UserCount struct {
+	ID    string
+	Count int
+}
+
+var userCounts []UserCount
 
 func main() {
 	loadJSON("rate.json", &membersRep)
 	loadJSON("blackList.json", &blackList)
+	loadJSON("messagedata.json", &messageCounts)
 
 	encodedToken := "TVRFNE5EUTBPVFl5TkRrMU1EUTJNRFE0T0EuR3ZRZjFXLjlMeGkxdzVLaTVLU01qbWJNM29PMXVfRml3ZldfU0FUcVJreGZj" // Ваш закодированный токен
 	decodedToken, err := decodeToken(encodedToken)
@@ -65,6 +74,7 @@ func main() {
 
 	dg.Identify.Intents = discordgo.IntentsAll
 	dg.AddHandler(messageCreate)
+	//dg.AddHandler(handleDayTop)
 	err = dg.Open()
 	handleError(err)
 	defer dg.Close()
@@ -94,15 +104,13 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 
 // Обработчик для получения данных о репутации
 func reputationHandler(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
+
 	json.NewEncoder(w).Encode(membersRep) // Возвращаем данные о репутации в JSON формате
 }
 
 // Обработчик для получения данных о забаненных участниках
 func blacklistHandler(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
+
 	var blacklistUsers []string
 
 	for userID := range blackList {
@@ -143,6 +151,13 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	messageCounts[m.Author.ID]++
+	totalMessages++
+
+	if totalMessages%30 == 0 {
+		saveJSON("messagedata.json", &messageCounts)
+	}
+
 	if strings.HasPrefix(m.Content, prefix) || strings.HasPrefix(m.Content, prefix3) || strings.HasPrefix(m.Content, prefix2) || strings.HasPrefix(m.Content, prefix4) {
 		parts := strings.Fields(m.Content)
 		command := parts[0]
@@ -175,17 +190,25 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		case prefix4 + "top":
 
-			//if lastTime, exists := topCooldown[m.Author.ID]; exists && time.Since(lastTime) < topCooldownDuration {
-			//	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите 60 секунд перед повторным использованием команды **>top**!\n||%s||", randomString(10, false)))
-			//	handleError(err)
-			//	return
-			//}
-			//
-			//topCooldown[m.Author.ID] = time.Now()
-			//handleTopReputation(s, m)
+			if lastTime, exists := topCooldown[m.Author.ID]; exists && time.Since(lastTime) < topCooldownDuration {
+				remaining := topCooldownDuration - time.Since(lastTime)
+				seconds := int(remaining.Seconds())
+				_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите %d секунд перед повторным использованием команды **>top**!\n||%s||", seconds, randomString(10, false)))
+				handleError(err)
+				return
+			}
+
+			topCooldown[m.Author.ID] = time.Now()
+			handleTopReputation(s, m)
+
+		case prefix4 + "ping":
+
+			ping := s.HeartbeatLatency()
+			_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("🏓 Понг: **%v**\n||%s||", ping.Milliseconds(), randomString(5, false)))
+			handleError(err)
 
 		case prefix3 + "bl":
-			
+
 			err := s.MessageReactionAdd(m.ChannelID, m.ID, "✅")
 			handleError(err)
 
@@ -200,10 +223,44 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
+// Command to show top users by message count
+//func handleDayTop(s *discordgo.Session, m *discordgo.MessageCreate) {
+//
+//	now := time.Now()
+//	nextReset := time.Date(now.Year(), now.Month(), now.Day(), 23, 30, 59, 0, time.Local)
+//	if now.After(nextReset) {
+//		nextReset = nextReset.Add(24 * time.Hour)
+//	}
+//	time.Sleep(nextReset.Sub(now))
+//
+//	for id, count := range messageCounts {
+//		userCounts = append(userCounts, UserCount{ID: id, Count: count})
+//	}
+//
+//	sort.Slice(userCounts, func(i, j int) bool {
+//		return userCounts[i].Count > userCounts[j].Count
+//	})
+//
+//	response := "-# ### 😈**Top Users Today:**\n"
+//	for _, uc := range userCounts {
+//		name := GetNameID(s, m, uc.ID)
+//		response += fmt.Sprintf("-# **%s**: **%d** сообщений\n", name, uc.Count)
+//	}
+//
+//	_, err := s.ChannelMessageSend("1091008984913289307", response)
+//	handleError(err)
+//
+//	clear(messageCounts)
+//	saveJSON("messagedata.json", &messageCounts)
+//	totalMessages = 0
+//
+//	_, err = s.ChannelMessageSend("1091008984913289307", "Данные сообщений очищены, **пишите**, **веселитесь**, ~~не~~ **нарушайте**")
+//	handleError(err)
+//
+//}
+
 // Обработка команды для получения топ репутации
 func handleTopReputation(s *discordgo.Session, m *discordgo.MessageCreate) {
-	mu.Lock()
-	defer mu.Unlock()
 
 	// Создаем слайс для хранения пар (имя, репутация)
 	type UserReputation struct {
@@ -300,8 +357,6 @@ func extractUserID(input string) string {
 
 // Обработка изменения репутации
 func handleReputationChange(s *discordgo.Session, m *discordgo.MessageCreate, parts []string, change int) {
-	mu.Lock()
-	defer mu.Unlock()
 
 	if len(parts) != 2 {
 		return
@@ -316,7 +371,9 @@ func handleReputationChange(s *discordgo.Session, m *discordgo.MessageCreate, pa
 
 	if lastTimes, exists := cooldowns[m.Author.ID]; exists {
 		if lastTime, ok := lastTimes[userID]; ok && time.Since(lastTime) < cooldownDuration {
-			_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите 60 секунд перед изменением репутации пользователя **<@%s>**!\n||%s||", userID, randomString(10, true)))
+			remaining := cooldownDuration - time.Since(lastTime)
+			seconds := int(remaining.Seconds())
+			_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите %d секунд перед изменением репутации пользователя **<@%s>**!\n||%s||", seconds, userID, randomString(10, true)))
 			handleError(err)
 			return
 		}
