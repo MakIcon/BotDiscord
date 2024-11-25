@@ -62,7 +62,6 @@ func main() {
 
 	fmt.Println(decodedToken)
 
-	// Инициализация Discord
 	dg, err := discordgo.New(decodedToken)
 	handleError(err)
 
@@ -190,16 +189,16 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		case prefix4 + "top":
 
-			if lastTime, exists := topCooldown[m.Author.ID]; exists && time.Since(lastTime) < topCooldownDuration {
-				remaining := topCooldownDuration - time.Since(lastTime)
-				seconds := int(remaining.Seconds())
-				_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите %d секунд перед повторным использованием команды **>top**!\n||%s||", seconds, randomString(10, false)))
-				handleError(err)
-				return
-			}
-
-			topCooldown[m.Author.ID] = time.Now()
-			handleTopReputation(s, m)
+			//if lastTime, exists := topCooldown[m.Author.ID]; exists && time.Since(lastTime) < topCooldownDuration {
+			//	remaining := topCooldownDuration - time.Since(lastTime)
+			//	seconds := int(remaining.Seconds())
+			//	_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Пожалуйста, подождите %d секунд перед повторным использованием команды **>top**!\n||%s||", seconds, randomString(10, false)))
+			//	handleError(err)
+			//	return
+			//}
+			//
+			//topCooldown[m.Author.ID] = time.Now()
+			//handleTopReputation(s, m)
 
 		case prefix4 + "ping":
 
