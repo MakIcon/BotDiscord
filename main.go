@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"github.com/gorilla/websocket"
 	"io/ioutil"
+	"log"
 	"math"
 	"math/rand"
 	"net/http"
@@ -44,12 +46,11 @@ var (
 	totalMessages = 0
 )
 
-type UserCount struct {
-	ID    string
-	Count int
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-var userCounts []UserCount
+var clients []*websocket.Conn
 
 func main() {
 	loadJSON("rate.json", &membersRep)
@@ -73,7 +74,6 @@ func main() {
 
 	dg.Identify.Intents = discordgo.IntentsAll
 	dg.AddHandler(messageCreate)
-	//dg.AddHandler(handleDayTop)
 	err = dg.Open()
 	handleError(err)
 	defer dg.Close()
@@ -88,11 +88,12 @@ func main() {
 
 // Запуск сервера
 func startServer() {
-	http.HandleFunc("/", servePage)                   // Обработчик для главной страницы
-	http.HandleFunc("/reputation", reputationHandler) // Обработчик для получения репутации
-	http.HandleFunc("/blacklist", blacklistHandler)   // Обработчик для получения забаненных пользователей
-	fmt.Println("Starting server on :20053")
-	err := http.ListenAndServe(":20053", nil) // Запуск сервера
+	http.HandleFunc("/", servePage)
+	http.HandleFunc("/ws", handleConnections)
+	http.HandleFunc("/save-color", SaveColorHandler)
+	http.HandleFunc("/load-colors", LoadColorsHandler)
+	log.Println("Server started on :20053")
+	err := http.ListenAndServe(":20053", nil)
 	handleError(err)
 }
 
@@ -101,22 +102,74 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "site_c/index.html") // Размещаем HTML-страницу в папке site_c
 }
 
-// Обработчик для получения данных о репутации
-func reputationHandler(w http.ResponseWriter, r *http.Request) {
+func handleConnections(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Print("Error during connection upgrade:", err)
+		return
+	}
+	defer conn.Close()
 
-	json.NewEncoder(w).Encode(membersRep) // Возвращаем данные о репутации в JSON формате
+	clients = append(clients, conn)
+
+	for {
+		var msg map[string]string
+		err := conn.ReadJSON(&msg)
+		if err != nil {
+			break
+		}
+		broadcast(msg) // Уведомляем других клиентов об изменении
+	}
 }
 
-// Обработчик для получения данных о забаненных участниках
-func blacklistHandler(w http.ResponseWriter, r *http.Request) {
-
-	var blacklistUsers []string
-
-	for userID := range blackList {
-		blacklistUsers = append(blacklistUsers, userID)
+func broadcast(msg map[string]string) {
+	for _, client := range clients {
+		err := client.WriteJSON(msg)
+		if err != nil {
+			client.Close()
+			removeClient(client)
+		}
 	}
+}
 
-	json.NewEncoder(w).Encode(blacklistUsers) // Возвращаем данные о забаненных пользователях в JSON формате
+func removeClient(client *websocket.Conn) {
+	for i, c := range clients {
+		if c == client {
+			clients[i] = clients[len(clients)-1]
+			clients[len(clients)-1] = nil
+			clients = clients[:len(clients)-1]
+			break
+		}
+	}
+}
+
+func SaveColorHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		var colors map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&colors); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		existingColors := make(map[string]string)
+		loadJSON("colors.json", &existingColors)
+
+		for key, value := range colors {
+			existingColors[key] = value
+		}
+
+		saveJSON("colors.json", existingColors)
+
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+}
+
+func LoadColorsHandler(w http.ResponseWriter, r *http.Request) {
+	existingColors := make(map[string]string)
+	loadJSON("colors.json", &existingColors)
+	json.NewEncoder(w).Encode(existingColors)
 }
 
 // Функция для декодирования токена
@@ -221,42 +274,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 }
-
-// Command to show top users by message count
-//func handleDayTop(s *discordgo.Session, m *discordgo.MessageCreate) {
-//
-//	now := time.Now()
-//	nextReset := time.Date(now.Year(), now.Month(), now.Day(), 23, 30, 59, 0, time.Local)
-//	if now.After(nextReset) {
-//		nextReset = nextReset.Add(24 * time.Hour)
-//	}
-//	time.Sleep(nextReset.Sub(now))
-//
-//	for id, count := range messageCounts {
-//		userCounts = append(userCounts, UserCount{ID: id, Count: count})
-//	}
-//
-//	sort.Slice(userCounts, func(i, j int) bool {
-//		return userCounts[i].Count > userCounts[j].Count
-//	})
-//
-//	response := "-# ### 😈**Top Users Today:**\n"
-//	for _, uc := range userCounts {
-//		name := GetNameID(s, m, uc.ID)
-//		response += fmt.Sprintf("-# **%s**: **%d** сообщений\n", name, uc.Count)
-//	}
-//
-//	_, err := s.ChannelMessageSend("1091008984913289307", response)
-//	handleError(err)
-//
-//	clear(messageCounts)
-//	saveJSON("messagedata.json", &messageCounts)
-//	totalMessages = 0
-//
-//	_, err = s.ChannelMessageSend("1091008984913289307", "Данные сообщений очищены, **пишите**, **веселитесь**, ~~не~~ **нарушайте**")
-//	handleError(err)
-//
-//}
 
 // Обработка команды для получения топ репутации
 func handleTopReputation(s *discordgo.Session, m *discordgo.MessageCreate) {
