@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leader Board</title>
+    <title>Color Selection Panel</title>
     <style>
         body {
             margin: 0;
@@ -11,110 +11,184 @@
             font-family: Arial, sans-serif;
             height: 100vh;
             overflow: hidden;
-            background: linear-gradient(to right, #4facfe, #00f2fe); /* Gradient background */
-        }
-
-        .background-image {
-            background-image: url('https://github.com/MakIcon/BotDiscord/blob/main/sdelaydela.jpg?raw=true'); /* Optional image */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: url('https://github.com/MakIcon/BotDiscord/blob/main/sdelaydela.jpg?raw=true') no-repeat center center fixed;
             background-size: cover;
-            background-attachment: fixed;
-            height: 100vh;
-            width: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: -1;
         }
 
-        .overlay {
-            background: linear-gradient(rgba(207, 241, 235, 0.74), rgba(207, 222, 246, 0.72)); /* Transparent gradient */
-            padding: 20px;
-            border-radius: 15px;
-            margin: 50px auto; /* Centering the overlay */
-            width: 80%; /* Making the leaderboard narrower */
-            max-width: 800px; /* Maximum width for larger screens */
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-        }
-
-        h1 {
-            text-align: center; /* Centering the header */
-            font-size: 2.5em; /* Increased font size for the header */
-        }
-
-        #leaderboard {
-            margin-top: 20px;
-            text-align: center; /* Centering text in the leaderboard */
-            border-radius: 10px; /* Rounded corners for leaderboard */
-            padding: 10px; /* Padding inside the leaderboard */
-        }
-
-        #blacklistOverlay {
-            margin-top: 20px;
-            text-align: center;
-            border-radius: 10px;
+        #colorPickerContainer {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: rgba(255, 255, 255, 0.8);
             padding: 10px;
-            background: rgba(207, 222, 246, 0.72); /* Background similar to the first overlay */
+            border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
 
-        .user-entry {
-            font-size: 1.1em; /* Increased font size for user entries */
-            margin: 5px 0; /* Spacing between user entries */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pixel-container {
+            display: grid;
+            grid-template-columns: repeat(200, 5px);
+            grid-template-rows: repeat(200, 5px);
+        }
+
+        .pixel {
+            width: 5px;
+            height: 5px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
+
+        button {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+        }
+
+        #applyButton {
+            background-color: red; /* Red button for apply */
+        }
+
+        #cancelButton {
+            background-color: green; /* Green button for cancel */
         }
     </style>
 </head>
 <body>
-<div class="background-image"></div>
-<div class="overlay">
-    <h1>Таблица лидеров</h1>
-    <div id="leaderboard">
-        <!-- Данные о репутации будут вставлены сюда -->
+<div id="colorPickerContainer">
+    <h1>Color Selection</h1>
+    <div class="controls">
+        <button id="cancelButton" style="display:none;"></button>
+        <input type="color" id="colorPicker" />
+        <button id="applyButton" style="display:none;"></button>
     </div>
 </div>
 
-<div class="overlay" id="blacklistOverlay">
-    <h1>Забаненные участники</h1>
-    <div id="blacklist">
-        <!-- Данные о забаненных участниках будут вставлены сюда -->
-    </div>
-</div>
+<div class="pixel-container" id="pixelContainer"></div>
 
 <script>
-    async function fetchReputation() {
-        const response = await fetch('/reputation');
-        const data = await response.json();
-        const leaderboard = document.getElementById('leaderboard');
-        leaderboard.innerHTML = ''; // Очищаем предыдущие данные
+    const pixelContainer = document.getElementById('pixelContainer');
+    const colorPicker = document.getElementById('colorPicker');
+    const applyButton = document.getElementById('applyButton');
+    const cancelButton = document.getElementById('cancelButton');
+    let selectedPixel = null;
 
-        // Сортировка участников по репутации (по убыванию)
-        const sortedData = Object.entries(data).sort((a, b) => b[1] - a[1]);
+    // Create WebSocket connection
+    const socket = new WebSocket('ws://localhost:20053'); // Adjust URL as needed
 
-        for (const [userId, rep] of sortedData) {
-            const userDiv = document.createElement('div');
-            userDiv.textContent = `Пользователь ${userId}: ${rep} реп`;
-            userDiv.classList.add('user-entry'); // Adding a class for styling
-            leaderboard.appendChild(userDiv);
-        }
+    // Create pixel squares (200x200 grid)
+    for (let i = 0; i < 40000; i++) {
+        const pixel = document.createElement('div');
+        pixel.classList.add('pixel');
+        pixel.style.backgroundColor = '#ffffff'; // Default color
+
+        pixel.addEventListener('click', function() {
+            selectPixel(pixel);
+        });
+
+        pixelContainer.appendChild(pixel);
     }
 
-    async function fetchBlacklist() {
-        const response = await fetch('/blacklist');
-        const data = await response.json();
-        const blacklistDiv = document.getElementById('blacklist');
-        blacklistDiv.innerHTML = ''; // Очищаем предыдущие данные
+    // Load existing colors on page load
+    window.onload = async function() {
+        const response = await fetch('/load-colors');
+        const existingColors = await response.json();
 
-        for (const userId of data) {
-            const userDiv = document.createElement('div');
-            userDiv.textContent = `Пользователь ${userId} забанен`;
-            userDiv.classList.add('user-entry'); // Добавление класса для стилизации
-            blacklistDiv.appendChild(userDiv);
+        for (const [position, color] of Object.entries(existingColors)) {
+            const index = position.split('x').map(Number);
+            const pixelIndex = index[0] * 200 + index[1];
+            if (pixelContainer.children[pixelIndex]) {
+                pixelContainer.children[pixelIndex].style.backgroundColor = color; // Set color
+            }
         }
+    };
+
+    function selectPixel(pixel) {
+        if (selectedPixel) {
+            selectedPixel.style.border = '1px solid #ccc'; // Reset previous selection
+        }
+
+        selectedPixel = pixel; // Set the newly selected pixel
+        selectedPixel.style.border = '2px solid blue'; // Highlight selected pixel
+        colorPicker.value = rgbToHex(selectedPixel.style.backgroundColor); // Set color picker to current color
+
+        colorPicker.style.display = 'block'; // Show color picker
+        applyButton.style.display = 'block'; // Show apply button
+        cancelButton.style.display = 'block'; // Show cancel button
     }
 
-    setInterval(fetchReputation, 5000); // Обновление данных каждые 5 секунд
-    setInterval(fetchBlacklist, 5000); // Обновление данных забаненных пользователей каждые 5 секунд
-    fetchReputation(); // Первоначальная загрузка при открытии
-    fetchBlacklist(); // Первоначальная загрузка черного списка
+    applyButton.addEventListener('click', function() {
+        if (selectedPixel) {
+            const newColor = colorPicker.value; // Получаем выбранный цвет
+            selectedPixel.style.backgroundColor = newColor; // Меняем цвет выбранного пикселя
+
+            const position = Array.from(pixelContainer.children).indexOf(selectedPixel); // Получаем позицию выбранного пикселя
+            const data = { [`${Math.floor(position / 200)}x${position % 200}`]: newColor }; // Форматируем как "rowxcol"
+
+            socket.send(JSON.stringify(data)); // Отправляем обновление через WebSocket
+
+            saveColor(position, newColor); // Также сохраняем через HTTP-запрос
+
+            resetSelection();
+        }
+    });
+
+    cancelButton.addEventListener('click', resetSelection);
+
+    function resetSelection() {
+        if (selectedPixel) {
+            selectedPixel.style.border = '1px solid #ccc'; // Reset border
+            selectedPixel = null; // Clear selection
+        }
+
+        colorPicker.style.display = 'none'; // Hide color picker
+        applyButton.style.display = 'none'; // Hide apply button
+        cancelButton.style.display = 'none'; // Hide cancel button
+    }
+
+    function rgbToHex(rgb) {
+        const result = rgb.match(/\d+/g);
+        return result ? `#${((1 << 24) + (result[0] << 16) + (result[1] << 8) + +result[2]).toString(16).slice(1)}` : '#ffffff';
+    }
+
+    async function saveColor(position, color) {
+        await fetch('/save-color', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ [`${Math.floor(position / 200)}x${position % 200}`]: color }) // Send data in JSON format
+        });
+    }
+
+    socket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+
+        const positionKey = Object.keys(data)[0];
+        const newColor = data[positionKey];
+
+        const indexParts = positionKey.split('x').map(Number);
+        const pixelIndex = indexParts[0] * 200 + indexParts[1];
+
+        if (pixelContainer.children[pixelIndex]) {
+            pixelContainer.children[pixelIndex].style.backgroundColor = newColor;
+            if (selectedPixel && Array.from(pixelContainer.children).indexOf(selectedPixel) === pixelIndex) {
+                selectedPixel.style.border = '2px solid blue';
+            }
+        }
+    };
+
 </script>
 </body>
 </html>
