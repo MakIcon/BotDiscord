@@ -1,7 +1,7 @@
 package main
 
 import (
-	"chat"
+	"BotDiscord/chat"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
