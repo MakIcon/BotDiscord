@@ -284,7 +284,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			response := airesponce(messageToSay, false)
 
-			_, err := s.ChannelMessageSend(m.ChannelID, response)
+			_, err := s.ChannelMessageSendReply(m.ChannelID, response, m.Reference())
 			handleError(err)
 
 		case prefixD + "ai":
@@ -296,7 +296,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			response := airesponce(prompt, true)
 
-			_, err := s.ChannelMessageSend(m.ChannelID, response)
+			_, err := s.ChannelMessageSendReply(m.ChannelID, response, m.Reference())
 			handleError(err)
 
 		}
