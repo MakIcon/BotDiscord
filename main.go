@@ -1,6 +1,7 @@
 package main
 
 import (
+	"BotDiscord/chat"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -22,12 +23,15 @@ import (
 )
 
 const (
-	prefix     = "+"
-	prefix2    = "-"
-	prefix3    = "!"
-	prefix4    = ">"
-	charset    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-*&^%$#@!)(*/|"
-	webhookURL = "https://canary.discord.com/api/webhooks/..."
+	prefix  = "+"
+	prefix2 = "-"
+	prefix3 = "!"
+	prefix4 = ">"
+
+	prefixA = "a"
+	prefixD = "d"
+
+	charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-*&^%$#@!)(*/|"
 )
 
 var (
@@ -210,7 +214,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		saveJSON("messagedata.json", &messageCounts)
 	}
 
-	if strings.HasPrefix(m.Content, prefix) || strings.HasPrefix(m.Content, prefix3) || strings.HasPrefix(m.Content, prefix2) || strings.HasPrefix(m.Content, prefix4) {
+	if strings.HasPrefix(m.Content, prefix) || strings.HasPrefix(m.Content, prefix3) || strings.HasPrefix(m.Content, prefix2) || strings.HasPrefix(m.Content, prefix4) || strings.HasPrefix(m.Content, prefixA) || strings.HasPrefix(m.Content, prefixD) {
 		parts := strings.Fields(m.Content)
 		command := parts[0]
 
@@ -271,8 +275,52 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		case prefix3 + "setrep":
 			handleSetReputation(s, m, parts)
+
+		case prefixA + "lo":
+			if len(parts) < 2 {
+				return
+			}
+			messageToSay := strings.Join(parts[1:], " ")
+
+			response := airesponce(messageToSay, false)
+
+			_, err := s.ChannelMessageSend(m.ChannelID, response)
+			handleError(err)
+
+		case prefixD + "ai":
+			if len(parts) < 2 {
+				return
+			}
+
+			prompt := strings.Join(parts[1:], " ")
+
+			response := airesponce(prompt, true)
+
+			_, err := s.ChannelMessageSend(m.ChannelID, response)
+			handleError(err)
+
 		}
+
 	}
+}
+
+func airesponce(prompt string, img bool) string {
+	model := chat.MODELS.Gpt4o
+
+	chatInstance := chat.New(&model, true, 0.7)
+
+	if img {
+		chatInstance.AgentMode = chat.MODES.ImageGeneration
+	}
+
+	userMessage := chat.Message{
+		Role:    "user",
+		Content: prompt,
+	}
+
+	response := chatInstance.SendMessage(userMessage)
+
+	return response
 }
 
 // Обработка команды для получения топ репутации
